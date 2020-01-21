@@ -192,24 +192,22 @@
     
     self.imageRequestID =
     [self.imageManager ctassetsPickerRequestImageForAsset:self.asset
-                                 targetSize:targetSize
-                                contentMode:PHImageContentModeAspectFit
-                                    options:options
-                              resultHandler:^(UIImage *image, NSDictionary *info) {
+                                               targetSize:targetSize
+                                              contentMode:PHImageContentModeAspectFit
+                                                  options:options
+                                            resultHandler:^(UIImage *image, NSDictionary *info) {
+        if (info[PHImageCancelledKey]) return;
+        // this image is set for transition animation
+        self.image = image;
 
-                                  // this image is set for transition animation
-                                  self.image = image;
-                                  
-                                  dispatch_async(dispatch_get_main_queue(), ^{
-                                  
-                                      NSError *error = info[PHImageErrorKey];
-                                      
-                                      if (error)
-                                          [self showRequestImageError:error title:nil];
-                                      else
-                                          [self.scrollView bind:self.asset image:image requestInfo:info];
-                                  });
-                              }];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *error = info[PHImageErrorKey];
+            if (error)
+                [self showRequestImageError:error title:nil];
+            else
+                [self.scrollView bind:self.asset image:image requestInfo:info];
+        });
+    }];
 }
 
 - (CGSize)targetImageSize
@@ -245,17 +243,18 @@
     [self.imageManager requestPlayerItemForVideo:self.asset
                                          options:options
                                    resultHandler:^(AVPlayerItem *playerItem, NSDictionary *info) {
-                                       dispatch_async(dispatch_get_main_queue(), ^{
-                                           
-                                           NSError *error   = info[PHImageErrorKey];
-                                           NSString * title = CTAssetsPickerLocalizedString(@"Cannot Play Stream Video", nil);
-                                           
-                                           if (error)
-                                               [self showRequestVideoError:error title:title];
-                                           else
-                                               [self.scrollView bind:playerItem requestInfo:info];
-                                       });
-                                   }];
+        if (info[PHImageCancelledKey]) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+
+            NSError *error   = info[PHImageErrorKey];
+            NSString * title = CTAssetsPickerLocalizedString(@"Cannot Play Stream Video", nil);
+
+            if (error)
+                [self showRequestVideoError:error title:title];
+            else
+                [self.scrollView bind:playerItem requestInfo:info];
+        });
+    }];
 }
 
 - (PHVideoRequestOptions *)videoRequestOptions
