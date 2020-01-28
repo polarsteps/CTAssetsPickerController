@@ -125,7 +125,7 @@ NSString * const CTAssetScrollViewShouldDismissNotification = @"CTAssetScrollVie
     self.playButton = playButton;
     [self addSubview:self.playButton];
     
-    CTAssetSelectionButton *selectionButton = [CTAssetSelectionButton newAutoLayoutView];
+    CTAssetSelectionButton *selectionButton = [[CTAssetSelectionButton alloc] initWithFrame:CGRectMake(0, 0, 31, 31)];
     self.selectionButton = selectionButton;
     [self addSubview:self.selectionButton];
 }
@@ -186,9 +186,10 @@ NSString * const CTAssetScrollViewShouldDismissNotification = @"CTAssetScrollVie
     self.imageView.frame = imageFrame;
     if (CGRectIsEmpty(imageFrame))
         return;
-    self.selectionButton.frame = CGRectMake((int)(imageFrame.origin.x + imageFrame.size.width - 31),
-                                            (int)(imageFrame.origin.y + imageFrame.size.height - 31),
-                                            31, 31);
+    CGFloat selectionButtonInset = 10;
+    self.selectionButton.frame = CGRectMake((int)(imageFrame.origin.x + imageFrame.size.width - self.selectionButton.frame.size.width - selectionButtonInset),
+                                            (int)(imageFrame.origin.y + imageFrame.size.height - self.selectionButton.frame.size.height - selectionButtonInset),
+                                            self.selectionButton.frame.size.width, self.selectionButton.frame.size.height);
     if (!self.playButton.isHidden) {
         self.playButton.frame = CGRectMake(imageFrame.origin.x + imageFrame.size.width / 2 - 35,
                                            imageFrame.origin.y + imageFrame.size.height / 2 - 35,
@@ -537,7 +538,7 @@ NSString * const CTAssetScrollViewShouldDismissNotification = @"CTAssetScrollVie
             // If pan ended, decide it we should close or reset the view
             // based on the final position and the speed of the gesture
             CGPoint velocity = [gr velocityInView:self];
-            BOOL shouldDismiss = (translation.y > self.frame.size.height * 0.2) || velocity.y > 1500;
+            BOOL shouldDismiss = (translation.y > self.frame.size.height * 0.15) || velocity.y > 1500;
 
             if (shouldDismiss) {
                 [[NSNotificationCenter defaultCenter] postNotificationName:CTAssetScrollViewShouldDismissNotification object:nil];

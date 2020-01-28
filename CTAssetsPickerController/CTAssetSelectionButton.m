@@ -93,12 +93,6 @@
 {
     if (!self.didSetupConstraints)
     {
-        CGSize size = [UIImage ctassetsPickerImageNamed:@"CheckmarkUnselected"].size;
-        
-        [NSLayoutConstraint autoSetPriority:UILayoutPriorityRequired forConstraints:^{
-            [self autoSetDimensionsToSize:size];
-        }];
-        
         [self.backgroundView autoCenterInSuperview];
         [self.checkmark autoCenterInSuperview];
         
