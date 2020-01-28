@@ -123,7 +123,7 @@
 
 - (CTAssetsPickerController *)picker
 {
-    return (CTAssetsPickerController *)self.splitViewController.parentViewController;
+    return (CTAssetsPickerController *)self.presentingViewController;
 }
 
 
@@ -362,7 +362,6 @@
     
     [self assetScrollView:self.scrollView didUnhighlightAsset:self.asset];
 }
-
 
 #pragma mark - Asset scrollView delegate
 

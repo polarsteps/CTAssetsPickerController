@@ -93,8 +93,15 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+
+    self.view.opaque = NO;
+    self.view.backgroundColor = [UIColor clearColor];
     [self setupViews];
     [self addNotificationObserver];
+}
+
+- (void)dismiss {
+    [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)dealloc
@@ -117,8 +124,25 @@
 - (void)setupViews
 {
     self.pageView = [CTAssetsPageView new];
+    [self setupPageView:self.pageView];
     [self.view insertSubview:self.pageView atIndex:0];
     [self.view setNeedsUpdateConstraints];
+}
+
+- (void)setupPageView:(CTAssetsPageView *)pageView {
+    if (!UIAccessibilityIsReduceTransparencyEnabled()) {
+        pageView.pageBackgroundColor = [UIColor clearColor];
+
+        UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
+        UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+        //always fill the view
+        blurEffectView.frame = pageView.bounds;
+        blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+
+        [pageView addSubview:blurEffectView]; //if you have more UIViews, use an insertSubview API to place it where needed
+    } else {
+        pageView.pageBackgroundColor = [UIColor whiteColor];
+    }
 }
 
 - (void)setupButtons
@@ -185,8 +209,6 @@
 {
     return [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
 }
-
-
 
 #pragma mark - Accessors
 
@@ -304,7 +326,12 @@
     [center addObserver:self
                selector:@selector(assetScrollViewPlayerWillPause:)
                    name:CTAssetScrollViewPlayerWillPauseNotification
-                 object:nil];    
+                 object:nil];
+
+    [center addObserver:self
+               selector:@selector(scrollViewShouldDismiss)
+                   name:CTAssetScrollViewShouldDismissNotification
+                 object:nil];
 }
 
 - (void)removeNotificationObserver
@@ -315,29 +342,32 @@
     [center removeObserver:self name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
     [center removeObserver:self name:CTAssetScrollViewPlayerWillPlayNotification object:nil];
     [center removeObserver:self name:CTAssetScrollViewPlayerWillPauseNotification object:nil];
+    [center removeObserver:self name:CTAssetScrollViewShouldDismissNotification object:nil];
 }
 
 
 #pragma mark - Notification events
+
+- (void)scrollViewShouldDismiss {
+    [self dismiss];
+}
 
 - (void)assetScrollViewDidTap:(NSNotification *)notification
 {
     UITapGestureRecognizer *gesture = (UITapGestureRecognizer *)notification.object;
     
     if (gesture.numberOfTapsRequired == 1)
-        [self toggleFullscreen:gesture];
+        [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)assetScrollViewPlayerDidPlayToEnd:(NSNotification *)notification
 {
     [self replaceToolbarButton:self.playButton];
-    [self setFullscreen:NO];
 }
 
 - (void)assetScrollViewPlayerWillPlay:(NSNotification *)notification
 {
     [self replaceToolbarButton:self.pauseButton];
-    [self setFullscreen:YES];
 }
 
 - (void)assetScrollViewPlayerWillPause:(NSNotification *)notification
