@@ -33,6 +33,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 extern NSString * const CTAssetScrollViewDidTapNotification;
+extern NSString * const CTAssetScrollViewShouldDismissNotification;
 extern NSString * const CTAssetScrollViewPlayerWillPlayNotification;
 extern NSString * const CTAssetScrollViewPlayerWillPauseNotification;
 

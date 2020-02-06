@@ -37,6 +37,7 @@
 NSString * const CTAssetScrollViewDidTapNotification = @"CTAssetScrollViewDidTapNotification";
 NSString * const CTAssetScrollViewPlayerWillPlayNotification = @"CTAssetScrollViewPlayerWillPlayNotification";
 NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollViewPlayerWillPauseNotification";
+NSString * const CTAssetScrollViewShouldDismissNotification = @"CTAssetScrollViewShouldDismissNotification";
 
 
 
@@ -59,15 +60,14 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
 @property (nonatomic, strong) CTAssetPlayButton *playButton;
 @property (nonatomic, strong) CTAssetSelectionButton *selectionButton;
 
+@property (nonatomic, strong) NSLayoutConstraint *imageWidthConstraint;
+@property (nonatomic, strong) NSLayoutConstraint *imageHeightConstraint;
+
 @property (nonatomic, assign) BOOL shouldUpdateConstraints;
 @property (nonatomic, assign) BOOL didSetupConstraints;
 
 
 @end
-
-
-
-
 
 @implementation CTAssetScrollView
 
@@ -107,6 +107,7 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
     UIImageView *imageView = [UIImageView new];
     imageView.isAccessibilityElement    = YES;
     imageView.accessibilityTraits       = UIAccessibilityTraitImage;
+    imageView.layer.masksToBounds       = YES;
     self.imageView = imageView;
     [self addSubview:self.imageView];
     
@@ -124,7 +125,7 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
     self.playButton = playButton;
     [self addSubview:self.playButton];
     
-    CTAssetSelectionButton *selectionButton = [CTAssetSelectionButton newAutoLayoutView];
+    CTAssetSelectionButton *selectionButton = [[CTAssetSelectionButton alloc] initWithFrame:CGRectMake(0, 0, 31, 31)];
     self.selectionButton = selectionButton;
     [self addSubview:self.selectionButton];
 }
@@ -140,12 +141,12 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
         [self autoPinEdgesToSuperviewEdgesWithInsets:UIEdgeInsetsZero];
         [self updateProgressConstraints];
         [self updateActivityConstraints];
-        [self updateButtonsConstraints];
         
         self.didSetupConstraints = YES;
     }
 
-    [self updateContentFrame];
+    self.contentOffset = CGPointZero;
+    [self updateContentFrameOffsetedBy:0];
     [super updateConstraints];
 }
 
@@ -179,37 +180,38 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
     [self.activityView autoAlignAxis:ALAxisHorizontal toSameAxisOfView:self.superview];
 }
 
-- (void)updateButtonsConstraints
+- (void)updateContentFrameOffsetedBy:(CGFloat)yOffset
 {
-    [self.playButton autoAlignAxis:ALAxisVertical toSameAxisOfView:self.superview];
-    [self.playButton autoAlignAxis:ALAxisHorizontal toSameAxisOfView:self.superview];
-    
-    [NSLayoutConstraint autoSetPriority:UILayoutPriorityDefaultLow forConstraints:^{
-        [self.selectionButton autoConstrainAttribute:ALAttributeTrailing toAttribute:ALAttributeTrailing ofView:self.superview withOffset:-self.layoutMargins.right relation:NSLayoutRelationEqual];
-        [self.selectionButton autoConstrainAttribute:ALAttributeBottom toAttribute:ALAttributeBottom ofView:self.superview withOffset:-self.layoutMargins.bottom relation:NSLayoutRelationEqual];
-    }];
-    
-    [NSLayoutConstraint autoSetPriority:UILayoutPriorityDefaultHigh forConstraints:^{
-        [self.selectionButton autoConstrainAttribute:ALAttributeTrailing toAttribute:ALAttributeTrailing ofView:self.imageView withOffset:-self.layoutMargins.right relation:NSLayoutRelationLessThanOrEqual];
-        [self.selectionButton autoConstrainAttribute:ALAttributeBottom toAttribute:ALAttributeBottom ofView:self.imageView withOffset:-self.layoutMargins.bottom relation:NSLayoutRelationLessThanOrEqual];
-    }];
+    CGRect imageFrame = [self calculateContentFrameOffsetedBy:yOffset];
+    self.imageView.frame = imageFrame;
+    if (CGRectIsEmpty(imageFrame))
+        return;
+    CGFloat selectionButtonInset = 10;
+    self.selectionButton.frame = CGRectMake((int)(imageFrame.origin.x + imageFrame.size.width - self.selectionButton.frame.size.width - selectionButtonInset),
+                                            (int)(imageFrame.origin.y + imageFrame.size.height - self.selectionButton.frame.size.height - selectionButtonInset),
+                                            self.selectionButton.frame.size.width, self.selectionButton.frame.size.height);
+    if (!self.playButton.isHidden) {
+        self.playButton.frame = CGRectMake(imageFrame.origin.x + imageFrame.size.width / 2 - 35,
+                                           imageFrame.origin.y + imageFrame.size.height / 2 - 35,
+                                           70, 70);
+    }
 }
 
-- (void)updateContentFrame
-{
+- (CGRect)calculateContentFrameOffsetedBy:(CGFloat)yOffset {
+    if (!self.asset)
+        return CGRectZero;
+    CGFloat inset = 10;
     CGSize boundsSize = self.bounds.size;
-    
-    CGFloat w = self.zoomScale * self.asset.pixelWidth;
-    CGFloat h = self.zoomScale * self.asset.pixelHeight;
-    
+
+    CGFloat w = self.zoomScale * self.asset.pixelWidth - inset * 2;
+    CGFloat h = self.zoomScale * self.asset.pixelHeight
+        - inset * 2 * self.asset.pixelHeight / (self.asset.pixelWidth ?: 1);
+
     CGFloat dx = (boundsSize.width - w) / 2.0;
     CGFloat dy = (boundsSize.height - h) / 2.0;
 
-    self.contentOffset = CGPointZero;
-    self.imageView.frame = CGRectMake(dx, dy, w, h);
+    return CGRectMake(dx, dy + yOffset, w, h);
 }
-
-
 
 #pragma mark - Start/stop loading animation
 
@@ -286,6 +288,9 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
         BOOL zoom = (!self.image);
         self.image = image;
         self.imageView.image = image;
+        if (self.imageView.layer.transform.m11) {
+            self.imageView.layer.cornerRadius = 20 / self.imageView.layer.transform.m11;
+        }
         
         if (isDegraded)
             [self mimicProgress];
@@ -308,6 +313,8 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
     AVPlayer *player = [AVPlayer playerWithPlayerItem:playerItem];
     AVPlayerLayer *playerLayer = [AVPlayerLayer playerLayerWithPlayer:player];
     playerLayer.videoGravity = AVLayerVideoGravityResizeAspect;
+    playerLayer.cornerRadius = 8;
+    playerLayer.masksToBounds = YES;
 
     CALayer *layer = self.imageView.layer;
     [layer addSublayer:playerLayer];
@@ -486,15 +493,19 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
 {
     UITapGestureRecognizer *singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTapping:)];
     UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTapping:)];
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     
     doubleTap.numberOfTapsRequired = 2.0;
     [singleTap requireGestureRecognizerToFail:doubleTap];
+
     
     singleTap.delegate = self;
     doubleTap.delegate = self;
+    pan.delegate = self;
     
     [self addGestureRecognizer:singleTap];
     [self addGestureRecognizer:doubleTap];
+    [self addGestureRecognizer:pan];
 }
 
 
@@ -502,12 +513,49 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
 
 - (void)handleTapping:(UITapGestureRecognizer *)recognizer
 {
-    [[NSNotificationCenter defaultCenter] postNotificationName:CTAssetScrollViewDidTapNotification object:recognizer];
+    CGPoint offset = [recognizer locationInView:self.imageView];
+    if (!CGRectContainsPoint(self.imageView.bounds, offset)) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:CTAssetScrollViewDidTapNotification object:recognizer];
+    }
     
     if (recognizer.numberOfTapsRequired == 2)
         [self zoomWithGestureRecognizer:recognizer];
 }
 
+#pragma mark - Pan
+
+- (void)handlePan:(UIPanGestureRecognizer *)gr {
+    CGPoint translation = [gr translationInView:self];
+
+    switch (gr.state) {
+        case UIGestureRecognizerStateBegan:
+        case UIGestureRecognizerStateChanged: {
+            CGFloat y = MAX(translation.y, 0);
+            [self updateContentFrameOffsetedBy:y];
+            break;
+        }
+        case UIGestureRecognizerStateEnded: {
+            // If pan ended, decide it we should close or reset the view
+            // based on the final position and the speed of the gesture
+            CGPoint velocity = [gr velocityInView:self];
+            BOOL shouldDismiss = (translation.y > self.frame.size.height * 0.15) || velocity.y > 1500;
+
+            if (shouldDismiss) {
+                [[NSNotificationCenter defaultCenter] postNotificationName:CTAssetScrollViewShouldDismissNotification object:nil];
+            } else {
+                [UIView animateWithDuration:0.2 animations:^{
+                    [self updateContentFrameOffsetedBy:0];
+                }];
+            }
+        }
+        default: {
+            [UIView animateWithDuration:0.2 animations:^{
+                [self updateContentFrameOffsetedBy:0];
+            }];
+        }
+
+    }
+}
 
 #pragma mark - Scroll view delegate
 
@@ -538,6 +586,11 @@ NSString * const CTAssetScrollViewPlayerWillPauseNotification = @"CTAssetScrollV
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
 {
     return !([touch.view isDescendantOfView:self.playButton] || [touch.view isDescendantOfView:self.selectionButton]);
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    return [gestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]];
 }
 
 
